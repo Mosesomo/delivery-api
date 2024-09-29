@@ -1,6 +1,6 @@
 SECRET_KEY=your_secret_key
 DATABASE_URI=connection_string
-AFRICAS_TALKING_API_KEY=generate api
-GOOGLE_CLIENT_ID=generate
-GOOGLE_CLIENT_SECRET=generate
+AFRICAS_TALKING_API_KEY=your_africas_talking_api_key
+GOOGLE_CLIENT_ID=your_google_client_id
+GOOGLE_CLIENT_SECRET=your_google_client_secret
 SERVER_NAME=localhost:5000
