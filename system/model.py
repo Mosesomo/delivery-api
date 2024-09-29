@@ -1,15 +1,21 @@
-from app import db
+from system import db, login_manager
 from datetime import datetime
+from flask_login import UserMixin
 
 
-class User(db.Model):
+@login_manager.user_loader
+def load_user(user_id):
+    return User.query.get(int(user_id))
+
+
+class User(db.Model, UserMixin):
     __tablename__ = 'users'
     
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(50), nullable=False)
     email = db.Column(db.String(100), unique=True, nullable=False)
     oauth_provider = db.Column(db.String(50), nullable=False, default='google')
-    oauth_id = db.Column(db.String(100), unique=True, nullable=False)
+    google_id = db.Column(db.String(100), unique=True, nullable=False)
     role = db.Column(db.String(20), nullable=False, default='user')  # user or admin
 
     def __repr__(self):
@@ -21,7 +27,6 @@ class Customer(db.Model):
     
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(50), nullable=False)
-    code = db.Column(db.String(20), unique=True, nullable=False)
     phone = db.Column(db.String(15), nullable=False)
 
     def to_dict(self):
