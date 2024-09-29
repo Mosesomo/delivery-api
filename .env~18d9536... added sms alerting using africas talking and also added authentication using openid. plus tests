@@ -1,0 +1,6 @@
+SECRET_KEY=5bfc5c547f2082df2f311c
+DATABASE_URI=postgresql://moses:root%4001@127.0.0.1:5432/customer_order
+AFRICAS_TALKING_API_KEY=atsk_8dd89f25232c54f7eb9a3cc8d42839bb153e536f7d8bd6ddb85bfc5c547f2082df2f311c
+GOOGLE_CLIENT_ID=445157692425-nl40islgbpuahjpa9qi6uq6768ucrcka.apps.googleusercontent.com
+GOOGLE_CLIENT_SECRET=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
+SERVER_NAME=localhost:5000
