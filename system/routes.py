@@ -35,34 +35,76 @@ def get_customers():
 
 # create order
 @app.route('/api/order', methods=['POST'])
+@app.route('/api/order', methods=['POST'])
 def create_order():
     data = request.get_json()
-    customer = Customer.query.filter_by(id=data['customer_id']).first()
-    
+
+    # Check if 'phone', 'item', and 'amount' are in the request data
+    if 'phone' not in data or 'item' not in data or 'amount' not in data:
+        return jsonify({'error': 'Phone number, item, and amount are required'}), 400
+
+    phone = data['phone']
+    item = data['item']
+    amount = data['amount']
+
+    # Find the customer using the phone number
+    customer = Customer.query.filter_by(phone=phone).first()
+
     if not customer:
         return jsonify({'error': 'Customer not found'}), 404
 
-    if not is_valid_phone_number(customer.phone):
-        return jsonify({'error': 'Invalid phone number'}), 400
     
+    if not is_valid_phone_number(phone):
+        return jsonify({'error': 'Invalid phone number format'}), 400
+
+    # Create a new order associated with the customer
     new_order = Order(
-        item=data['item'],
-        amount=data['amount'],
+        item=item,
+        amount=amount,
         customer_id=customer.id  # referencing the customer.id as foreign key
     )
-    
+
     db.session.add(new_order)
     db.session.commit()
 
-    # Sending SMS alert to customer
+    # Sending SMS alert to the customer
     sms_service = SendSMS()
     try:
         message = f"Hello {customer.name}, your order for {new_order.item} has been placed successfully."
         sms_service.send_message([customer.phone], message)
     except Exception as e:
         print(f"Failed to send SMS: {e}")
-    
+
     return jsonify({"message": "Order created successfully"}), 201
+
+# API to get specific customer's order statement
+@app.route('/api/order/<phone>', methods=['GET'])
+def get_order_by_phone(phone):
+    # Check if the customer exists based on phone number
+    customer = Customer.query.filter_by(phone=phone).first()
+    
+    if not customer:
+        return jsonify({'error': 'Customer not found'}), 404
+
+    # Retrieve all orders for the customer
+    orders = Order.query.filter_by(customer_id=customer.id).all()
+
+    if not orders:
+        return jsonify({'message': 'No orders found for this customer'}), 404
+
+    # Format orders into a list of dictionaries
+    order_list = [{
+        'order_id': order.id,
+        'item': order.item,
+        'amount': order.amount,
+        'created_at': order.time.strftime('%Y-%m-%d %H:%M:%S')  # Format date as needed
+    } for order in orders]
+
+    return jsonify({
+        'customer_name': customer.name,
+        'phone': customer.phone,
+        'orders': order_list
+    }), 200
 
 
 # Retrieve orders
