@@ -2,14 +2,22 @@
 customer route (crud operation)
 '''
 import os
-from flask import request, jsonify, url_for, redirect
-from flask_login import login_required, current_user
+import random
+import string
+from flask import request, jsonify, url_for, redirect, session
+from flask_login import login_required, current_user, login_user
 from system.model import Customer, Order, User
 from system import app, db, oauth, login_manager
 from system.sms import SendSMS
 from system.validate_phone import is_valid_phone_number
-from authlib.integrations.flask_client import OAuth
+from google_auth_oauthlib.flow import Flow
+from google.auth.transport import requests
+from oauthlib.oauth2.rfc6749.errors import InvalidGrantError
+import google.oauth2.id_token
 
+
+GOOGLE_CLIENT_ID = os.environ.get('GOOGLE_CLIENT_ID')
+GOOGLE_CLIENT_SECRET = os.environ.get('GOOGLE_CLIENT_SECRET')
 
 # create customer
 @app.route('/api/customer', methods=['POST'])
@@ -25,16 +33,35 @@ def create_customer():
 
 # Retrieve users
 @app.route('/api/customers', methods=['GET'])
-@login_required
 def get_customers():
-    if current_user.is_authenticated:
+    # Check if the user has credentials in the session (i.e., they're logged in)
+    if 'credentials' not in session:
+        return redirect(url_for('google_login'))
+
+    # Verify the user's identity with the credentials in the session
+    credentials = google.oauth2.credentials.Credentials(**session['credentials'])
+    request = requests.Request()
+    
+    try:
+        # Verify the ID token to ensure the user is authenticated
+        id_info = google.oauth2.id_token.verify_oauth2_token(credentials.id_token, request, GOOGLE_CLIENT_ID)
+
+        # Get user email or other identifying info
+        user_email = id_info['email']
+
+
+        # Fetch customers from the database if the user is authenticated and authorized
         customers = Customer.query.all()
         results = [{"id": c.id, 'name': c.name, 'phone': c.phone} for c in customers]
         return jsonify(results), 200
-    return jsonify({"error": "Unauthorized"}), 401
+
+    except ValueError:
+        # If token verification fails, log the user out and redirect to login
+        session.clear()
+        return redirect(url_for('google_login'))
+
 
 # create order
-@app.route('/api/order', methods=['POST'])
 @app.route('/api/order', methods=['POST'])
 def create_order():
     data = request.get_json()
@@ -109,7 +136,6 @@ def get_order_by_phone(phone):
 
 # Retrieve orders
 @app.route('/api/orders', methods=['GET'])
-@login_required
 def get_orders():
     if current_user.is_authenticated:
         orders = Order.query.all()
@@ -126,58 +152,54 @@ def get_orders():
         return jsonify(res), 200
     return jsonify({"error": "Unauthorized"}), 401
 
-@app.route('/google/')
-def google():
+@app.route('/google/login')
+def google_login():
     # Google OAuth configuration
-    GOOGLE_CLIENT_ID = os.environ.get('GOOGLE_CLIENT_ID')
-    GOOGLE_CLIENT_SECRET = os.environ.get('GOOGLE_CLIENT_SECRET')
-
-    CONF_URL = 'https://accounts.google.com/.well-known/openid-configuration'
-    oauth.register(
-        name='google',
-        client_id=GOOGLE_CLIENT_ID,
-        client_secret=GOOGLE_CLIENT_SECRET,
-        server_metadata_url=CONF_URL,
-        client_kwargs={
-            'scope': 'openid email profile',
-            'nonce': 'some_nonce_value'
-        }
+    flow = Flow.from_client_secrets_file(
+        'client_secret.json',
+        scopes=['openid', 'https://www.googleapis.com/auth/userinfo.profile', 'https://www.googleapis.com/auth/userinfo.email'],
+        redirect_uri='http://localhost:5000/google/auth/callback'
     )
+    authorization_url, state = flow.authorization_url(access_type='offline')
+    session['state'] = state  # Store the state in session
+    return redirect(authorization_url)
 
-    redirect_uri = url_for('google_auth', _external=True)
-    return oauth.google.authorize_redirect(redirect_uri)
-
-@app.route('/google/auth/')
+@app.route('/google/auth/callback')
 def google_auth():
+    flow = Flow.from_client_secrets_file(
+        'client_secret.json',
+        scopes=['openid', 'https://www.googleapis.com/auth/userinfo.profile', 'https://www.googleapis.com/auth/userinfo.email'],
+        state=session['state'],
+        redirect_uri='http://localhost:5000/google/auth/callback'
+    )
+    
     try:
-        token = oauth.google.authorize_access_token()
-        user_info = oauth.google.parse_id_token(token, None)
+        flow.fetch_token(authorization_response=request.url)
 
-        google_id = user_info.get('sub')
-        email = user_info.get('email')
-        username = user_info.get('name', email.split('@')[0])
-        
-        # Check if user exists
-        user = User.query.filter_by(google_id=google_id).first()
-        if not user:
-            user = User.query.filter_by(email=email).first()
-            if user:
-                return jsonify({'error': 'Email address already in use. Please log in.'}), 400
+        # Get the credentials and store them in session
+        credentials = flow.credentials
+        session['credentials'] = credentials_to_dict(credentials)
 
-            # Create a new user if not found
-            user = User(google_id=google_id, username=username, email=email)
-            db.session.add(user)
-            db.session.commit()
+        return redirect(url_for('get_customers'))
 
-        return jsonify({
-            'message': 'Logged in successfully',
-            'user': {
-                'id': user.id,
-                'username': user.username,
-                'email': user.email
-            }
-        }), 200
+    except ValueError as e:
+        # Clear the session if token verification fails
+        session.clear()
+        return redirect(url_for('google_login'))
+    
+    except InvalidGrantError as e:
+        # Clear the session for Invalid Grant Error as well
+        session.clear()
+        return redirect(url_for('google_login'))
 
-    except Exception as e:
-        print(f"Error during authentication: {e}")
-        return jsonify({'error': 'Authentication failed. Please try again.'}), 400
+
+def credentials_to_dict(credentials):
+    return {
+        'token': credentials.token,
+        'refresh_token': credentials.refresh_token,
+        'token_uri': credentials.token_uri,
+        'client_id': credentials.client_id,
+        'client_secret': credentials.client_secret,
+        'scopes': credentials.scopes
+    }
+
