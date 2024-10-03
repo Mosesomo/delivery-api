@@ -20,7 +20,7 @@ GOOGLE_CLIENT_ID = os.environ.get('GOOGLE_CLIENT_ID')
 GOOGLE_CLIENT_SECRET = os.environ.get('GOOGLE_CLIENT_SECRET')
 
 # create customer
-@app.route('/api/customer', methods=['POST'])
+@app.route('/api/customer', methods=['POST', 'OPTIONS'])
 def create_customer():
     data = request.get_json()
     new_customer = Customer(
