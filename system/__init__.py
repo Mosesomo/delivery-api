@@ -15,13 +15,14 @@ app.config['SECRET_KEY'] = os.getenv('SECRET_KEY')
 app.config['SERVER_NAME'] = os.environ.get('SERVER_NAME')
 app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URI')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-os.environ["OAUTHLIB_INSECURE_TRANSPORT"] = "1"
+os.environ["OAUTHLIB_INSECURE_TRANSPORT"] = "0"
 
-CORS(app, resources={r"/*": {"origins": "*"}})
 
 db = SQLAlchemy(app)
 migrate = Migrate(app, db)
 oauth = OAuth(app)
+
+CORS(app, resources={r"/*": {"origins": "*"}})
 
 login_manager = LoginManager(app)
 login_manager.login_view = 'google'
