@@ -26,6 +26,5 @@ class SendSMS:
         except Exception as e:
             print(f"Failed to send SMS: {e}")
 
-# Example of using the SendSMS class
 # sms_service = SendSMS()
 # sms_service.send_message(["+254758171116"], "Test message from Africa's Talking sandbox.")

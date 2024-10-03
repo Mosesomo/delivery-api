@@ -10,13 +10,14 @@ from authlib.integrations.flask_client import OAuth
 load_dotenv()
 
 app = Flask(__name__)
-CORS(app)
 
 app.config['SECRET_KEY'] = os.getenv('SECRET_KEY')
 app.config['SERVER_NAME'] = os.environ.get('SERVER_NAME')
 app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URI')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 os.environ["OAUTHLIB_INSECURE_TRANSPORT"] = "1"
+
+CORS(app, resources={r"/*": {"origins": "*"}})
 
 db = SQLAlchemy(app)
 migrate = Migrate(app, db)

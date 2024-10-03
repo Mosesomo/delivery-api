@@ -34,7 +34,7 @@ def create_customer():
 # Retrieve users
 @app.route('/api/customers', methods=['GET'])
 def get_customers():
-    # Check if the user has credentials in the session (i.e., they're logged in)
+    # Check if the user has credentials in the session
     if 'credentials' not in session:
         return redirect(url_for('google_login'))
 
@@ -124,7 +124,7 @@ def get_order_by_phone(phone):
         'order_id': order.id,
         'item': order.item,
         'amount': order.amount,
-        'created_at': order.time.strftime('%Y-%m-%d %H:%M:%S')  # Format date as needed
+        'created_at': order.time.strftime('%Y-%m-%d %H:%M:%S')
     } for order in orders]
 
     return jsonify({
@@ -137,20 +137,20 @@ def get_order_by_phone(phone):
 # Retrieve orders
 @app.route('/api/orders', methods=['GET'])
 def get_orders():
-    if current_user.is_authenticated:
-        orders = Order.query.all()
-        res = [
-            {
-                'item': order.item,
-                'amount': order.amount,
-                'time': order.time,
-                'customer': order.customer.name,
-                "phone": order.customer.phone
-            } for order in orders
-        ]
+    orders = Order.query.all()
+    res = [
+        {
+            'item': order.item,
+            'amount': order.amount,
+            'time': order.time,
+            'customer': order.customer.name,
+            "phone": order.customer.phone
+        } for order in orders
+    ]
         
-        return jsonify(res), 200
-    return jsonify({"error": "Unauthorized"}), 401
+    return jsonify(res), 200
+
+REDIRECT_URI = "http://localhost:5000/google/auth/"
 
 @app.route('/google/login')
 def google_login():
@@ -158,40 +158,50 @@ def google_login():
     flow = Flow.from_client_secrets_file(
         'client_secret.json',
         scopes=['openid', 'https://www.googleapis.com/auth/userinfo.profile', 'https://www.googleapis.com/auth/userinfo.email'],
-        redirect_uri='http://localhost:5000/google/auth/callback'
+        redirect_uri=url_for('google_auth', _external=True)
     )
+    
+    # Generate the authorization URL
     authorization_url, state = flow.authorization_url(access_type='offline')
-    session['state'] = state  # Store the state in session
+    
+    # Store the state in the session to verify the response later
+    session['state'] = state
+    
+    # Redirect the user to Google's OAuth 2.0 authorization server
     return redirect(authorization_url)
 
-@app.route('/google/auth/callback')
+@app.route('/google/auth/', methods=['POST'])
 def google_auth():
+    # Verify that the state exists in the session to prevent CSRF attacks
+    if 'state' not in session:
+        return redirect(url_for('google_login'))
+
     flow = Flow.from_client_secrets_file(
         'client_secret.json',
         scopes=['openid', 'https://www.googleapis.com/auth/userinfo.profile', 'https://www.googleapis.com/auth/userinfo.email'],
         state=session['state'],
-        redirect_uri='http://localhost:5000/google/auth/callback'
+        redirect_uri=url_for('google_auth', _external=True)  # Match the redirect URI exactly
     )
-    
-    try:
-        flow.fetch_token(authorization_response=request.url)
 
+    try:
+        # Fetch the token using the authorization response from Google
+        flow.fetch_token(authorization_response=request.url)
         # Get the credentials and store them in session
         credentials = flow.credentials
         session['credentials'] = credentials_to_dict(credentials)
 
+        # Redirect to the page
         return redirect(url_for('get_customers'))
 
     except ValueError as e:
-        # Clear the session if token verification fails
-        session.clear()
-        return redirect(url_for('google_login'))
-    
-    except InvalidGrantError as e:
-        # Clear the session for Invalid Grant Error as well
+        # Clear the session if the token verification fails
         session.clear()
         return redirect(url_for('google_login'))
 
+    except InvalidGrantError as e:
+        # Handle InvalidGrantError by clearing the session
+        session.clear()
+        return redirect(url_for('google_login'))
 
 def credentials_to_dict(credentials):
     return {
@@ -202,4 +212,3 @@ def credentials_to_dict(credentials):
         'client_secret': credentials.client_secret,
         'scopes': credentials.scopes
     }
-
