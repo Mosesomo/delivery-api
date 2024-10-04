@@ -2,7 +2,6 @@ import os
 from flask import Flask
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager
-from flask_cors import CORS
 from dotenv import load_dotenv
 from flask_migrate import Migrate
 from authlib.integrations.flask_client import OAuth
@@ -21,8 +20,6 @@ os.environ["OAUTHLIB_INSECURE_TRANSPORT"] = "0"
 db = SQLAlchemy(app)
 migrate = Migrate(app, db)
 oauth = OAuth(app)
-
-CORS(app, resources={r"/*": {"origins": "*"}})
 
 login_manager = LoginManager(app)
 login_manager.login_view = 'google'

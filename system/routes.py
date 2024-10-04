@@ -14,7 +14,10 @@ from google_auth_oauthlib.flow import Flow
 from google.auth.transport import requests
 from oauthlib.oauth2.rfc6749.errors import InvalidGrantError
 import google.oauth2.id_token
+from flask_cors import CORS
 
+
+CORS(app, resources={r"/*": {"origins": "*"}})
 
 GOOGLE_CLIENT_ID = os.environ.get('GOOGLE_CLIENT_ID')
 GOOGLE_CLIENT_SECRET = os.environ.get('GOOGLE_CLIENT_SECRET')
