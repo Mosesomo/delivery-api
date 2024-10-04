@@ -25,6 +25,8 @@ GOOGLE_CLIENT_SECRET = os.environ.get('GOOGLE_CLIENT_SECRET')
 # create customer
 @app.route('/api/customer', methods=['POST', 'OPTIONS'])
 def create_customer():
+    if request.method == 'OPTIONS':
+        return '', 200
     data = request.get_json()
     new_customer = Customer(
         name=data['name'],
